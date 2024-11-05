@@ -1,120 +1,87 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define MAX_SIZE 100
+#define MAX_RECORDS 100
+#define NAME_LENGTH 50
+#define FILENAME "students.csv"
 
-void insert_element(int arr[], int *size, int element, int position) {
-    if (*size >= MAX_SIZE) {
-        printf("Error: Array is full. Cannot insert element.\n");
-        return;
+typedef struct {
+    int id;
+    char name[NAME_LENGTH];
+} Student;
+
+typedef struct {
+    int id;
+    long position; // Position in the data file
+} IndexEntry;
+
+void writeRecords(FILE *dataFile) {
+    fprintf(dataFile, "ID,Name\n"); // Header row
+    Student students[MAX_RECORDS] = {
+        {1, "Aman"},
+        {2, "Shrikar"},
+        {3, "Ravi"},
+        {4, "Harish"},
+        {5, "Ramesh"}
+    };
+
+    for (int i = 0; i < 5; i++) {
+        fprintf(dataFile, "%d,%s\n", students[i].id, students[i].name);
     }
-    if (position < 0 || position > *size) {
-        printf("Error: Invalid position. Please enter a position between 0 and %d.\n", *size);
-        return;
-    }
-
-    // Shift elements to the right to make space for the new element
-    for (int i = *size; i > position; i--) {
-        arr[i] = arr[i - 1];
-    }
-
-    arr[position] = element; // Insert the new element
-    (*size)++;
-    printf("Element %d inserted at position %d.\n", element, position);
 }
 
-void delete_element(int arr[], int *size, int position) {
-    if (*size == 0) {
-        printf("Error: Array is empty. Cannot delete element.\n");
-        return;
-    }
-    if (position < 0 || position >= *size) {
-        printf("Error: Invalid position. Please enter a position between 0 and %d.\n", *size - 1);
-        return;
-    }
 
-    // Shift elements to the left to fill the gap
-    for (int i = position; i < *size - 1; i++) {
-        arr[i] = arr[i + 1];
-    }
+void createIndex(FILE *dataFile, IndexEntry *index, int *indexSize) {
+    fseek(dataFile, 0, SEEK_SET);
+    char line[NAME_LENGTH + 10]; // Buffer for reading lines
+    *indexSize = 0;
 
-    (*size)--; // Decrease the size of the array
-    printf("Element at position %d deleted.\n", position);
+    while (fgets(line, sizeof(line), dataFile)) {
+        // Get the position of the current line
+        index[*indexSize].position = ftell(dataFile) - strlen(line);
+        
+        // Parse the ID from the line
+        sscanf(line, "%d,", &index[*indexSize].id);
+        (*indexSize)++;
+    }
 }
 
-void display_array(const int arr[], int size) {
-    if (size == 0) {
-        printf("Array is empty.\n");
-        return;
-    }
-
-    printf("Array elements: ");
-    for (int i = 0; i < size; i++) {
-        printf("%d ", arr[i]);
-    }
-    printf("\n");
-}
-
-int search_element(const int arr[], int size, int element) {
-    for (int i = 0; i < size; i++) {
-        if (arr[i] == element) {
-            return i; // Return the index if found
+void searchRecord(FILE *dataFile, IndexEntry *index, int indexSize, int searchId) {
+    for (int i = 0; i < indexSize; i++) {
+        if (index[i].id == searchId) {
+            char line[NAME_LENGTH + 10];
+            fseek(dataFile, index[i].position, SEEK_SET);
+            fgets(line, sizeof(line), dataFile);
+            printf("Record Found: %s", line);
+            return;
         }
     }
-    return -1; // Return -1 if not found
+    printf("Record with ID %d not found.\n", searchId);
 }
 
 int main() {
-    int arr[MAX_SIZE];
-    int size = 0; // Current size of the array
-    int choice, element, position;
-
-    while (1) {
-        printf("\nMenu:\n");
-        printf("1. Insert Element\n");
-        printf("2. Delete Element\n");
-        printf("3. Display Array\n");
-        printf("4. Search Element\n");
-        printf("5. Exit\n");
-        printf("Enter your choice: ");
-        scanf("%d", &choice);
-
-        switch (choice) {
-            case 1:
-                printf("Enter element to insert: ");
-                scanf("%d", &element);
-                printf("Enter position to insert (0 to %d): ", size);
-                scanf("%d", &position);
-                insert_element(arr, &size, element, position);
-                break;
-            case 2:
-                if (size == 0) {
-                    printf("Array is empty. Nothing to delete.\n");
-                } else {
-                    printf("Enter position to delete (0 to %d): ", size - 1);
-                    scanf("%d", &position);
-                    delete_element(arr, &size, position);
-                }
-                break;
-            case 3:
-                display_array(arr, size);
-                break;
-            case 4:
-                printf("Enter element to search: ");
-                scanf("%d", &element);
-                position = search_element(arr, size, element);
-                if (position != -1) {
-                    printf("Element %d found at position %d.\n", element, position);
-                } else {
-                    printf("Element %d not found in the array.\n", element);
-                }
-                break;
-            case 5:
-                printf("Exiting...\n");
-                return 0;
-            default:
-                printf("Invalid choice. Please try again.\n");
-        }
+    FILE *dataFile = fopen(FILENAME, "w+");
+    if (dataFile == NULL) {
+        perror("Unable to open file");
+        return 1;
     }
 
+    // Step 1: Write records to the data file
+    writeRecords(dataFile);
+
+    // Step 2: Create an index for the records
+    IndexEntry index[MAX_RECORDS];
+    int indexSize;
+    createIndex(dataFile, index, &indexSize);
+
+    // Step 3: Search for records using the index
+    int searchId;
+    printf("Enter ID to search for: ");
+    scanf("%d", &searchId);
+    searchRecord(dataFile, index, indexSize, searchId);
+
+    // Clean up
+    fclose(dataFile);
     return 0;
 }
